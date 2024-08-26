@@ -8,6 +8,8 @@ When working on Elixir projects, you might occasionally need to rename your proj
 
 This Elixir script, `change_project_name.exs`, recursively traverses your project directory, renaming files and directories, and updating file contents to reflect the new project name. It's designed to handle various cases (uppercase, lowercase, and camelcase) to maintain the original formatting.
 
+You can find the full implementation of the script [here](https://github.com/ConsonHayashi/work_space/blob/main/change_project_name.exs).
+
 ### Key Features
 
 1. **Recursive Directory Processing**: The script walks through all subdirectories of your project.
