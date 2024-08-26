@@ -2,6 +2,8 @@
 
 ![Elixir Code on Computer Screen](https://images.unsplash.com/photo-1517694712202-14dd9538aa97?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80)
 
+**Topics:** Elixir, Automation, Project Management, Refactoring, Command-line Tools, File System Operations
+
 When working on Elixir projects, you might occasionally need to rename your project. This process can be tedious and error-prone if done manually. To simplify this task, I've created a handy Elixir script that automates the project renaming process.
 
 ## The Change Project Name Script
