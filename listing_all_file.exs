@@ -81,16 +81,28 @@ defmodule ListFiles do
   """
   defp generate_content(folder_path) do
     files_and_dirs = list_files_and_dirs(folder_path, 2)
-    Enum.map(files_and_dirs, fn {dir, files, level} ->
+
+    # Group files by directory
+    grouped_files = 
+      Enum.group_by(files_and_dirs, fn {dir, _, _} -> dir end)
+
+    # Generate content for each directory
+    Enum.map(grouped_files, fn {dir, entries} ->
+      level = 2  # Adjust the level as needed
       dir_title = if dir == "." do
-        "# All File"
+        "# All Files"
       else
         String.duplicate("#", level) <> " #{dir}"
       end
-      file_links = Enum.map(files, fn file ->
-        title = extract_title(Path.join(dir, file))
-        "[#{title}](./#{dir}/#{file})"
+
+      # Collect all files for this directory
+      file_links = Enum.flat_map(entries, fn {_, files, _} -> 
+        Enum.map(files, fn file ->
+          title = extract_title(Path.join(dir, file))
+          "[#{title}](./#{file})"
+        end)
       end)
+
       [dir_title | file_links] |> Enum.join("\n\n")
     end)
     |> Enum.join("\n\n")
@@ -112,15 +124,23 @@ defmodule ListFiles do
     path
     |> File.ls!()
     |> Enum.reject(&(String.starts_with?(&1, ".")))
-    |> Enum.reduce([], fn item, acc ->
+    |> Enum.reduce({[], MapSet.new()}, fn item, {acc, seen} ->
       full_path = Path.join(path, item)
       if File.dir?(full_path) do
-        sub_files_and_dirs = list_files_and_dirs(full_path, level + 1)
-        [{item, list_files(full_path), level} | sub_files_and_dirs] ++ acc
+        # Check if the directory has already been seen
+        unless MapSet.member?(seen, item) do
+          # Include the directory in the result
+          sub_files_and_dirs = list_files_and_dirs(full_path, level + 1)
+          {acc ++ [{item, list_files(full_path), level}] ++ elem(sub_files_and_dirs, 0), MapSet.put(seen, item)}
+        else
+          {acc, seen}
+        end
       else
-        acc
+        # Include files in the result
+        {acc ++ [{Path.basename(path), [item], level}], seen}  # Include files in the result
       end
     end)
+    |> elem(0)
   end
 
   @doc """
