@@ -16,7 +16,8 @@
 
 In the world of software development, automation is key. Today, we'll explore how to use Elixir to create a script that automatically generates a markdown index of files and directories. This tool can be incredibly useful for documenting project structures or creating quick overviews of file systems.
 
-You can find the code here.
+You can find the full implementation of the script [here](https://github.com/ConsonHayashi/work_space/blob/main/listing_all_file.exs).
+
 
 ## How It Works
 
