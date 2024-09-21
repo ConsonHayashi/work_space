@@ -1,4 +1,4 @@
-# change project name 
+# change project name
 
 # Usage: elixir change_project_name.exs <new_project_name> <old_project_name>
 # Example: elixir change_project_name.exs new_project_name old_project_name
@@ -11,188 +11,207 @@
 
 defmodule ChangeProjectName do
   @moduledoc """
-  A module to automate the process of renaming an Elixir project.
+   A module to automate the process of renaming an Elixir project.
 
-  This module provides functionality to recursively rename files, directories,
-  and update file contents with a new project name while preserving the original case.
+   This module provides functionality to recursively rename files, directories,
+   and update file contents with a new project name while preserving the original case.
 
-  ## Usage
+   ## Usage
 
-      ChangeProjectName.run(System.argv())
+       ChangeProjectName.run(System.argv())
 
-  From the command line:
+   From the command line:
 
-      elixir change_project_name.exs <new_project_name> <old_project_name>
+       elixir change_project_name.exs <new_project_name> <old_project_name> [--ignore folder1,folder2,...]
 
-  ## Examples
+   ## Examples
 
-      $ elixir change_project_name.exs new_awesome_project old_project_name
+       $ elixir change_project_name.exs new_awesome_project old_project_name --ignore deps,_build
 
-  """
+   """
 
-  @doc """
-  Runs the project renaming process based on command-line arguments.
+   def run(args) do
+     case parse_args(args) do
+       {:help} -> print_usage()
+       {:error, reason} -> IO.puts("Error: #{reason}")
+       {:ok, new_name, old_name, ignore_list} -> change_project_name(new_name, old_name, ignore_list)
+     end
+   end
 
-  ## Parameters
+   def parse_args(args) do
+     case args do
+       ["-h"] -> {:help}
+       [new_name, old_name | rest] ->
+         ignore_list = parse_ignore_option(rest)
+         {:ok, new_name, old_name, ignore_list}
+       _ -> {:error, "Invalid arguments"}
+     end
+   end
 
-    - args: A list of command-line arguments.
+   def parse_ignore_option(args) do
+     case args do
+       ["--ignore", folders] -> String.split(folders, ",", trim: true)
+       [] -> []
+       _ -> {:error, "Invalid ignore option"}
+     end
+   end
 
-  ## Returns
 
-    Prints usage information or executes the renaming process.
+   @doc """
+   Changes the project name from old_name to new_name.
 
-  """
-  def run(args)
+   This function initiates the recursive process of renaming files and directories,
+   and updating file contents.
 
-  @doc """
-  Changes the project name from old_name to new_name.
+   ## Parameters
 
-  This function initiates the recursive process of renaming files and directories,
-  and updating file contents.
+     - new_name: The new project name.
+     - old_name: The current project name to be replaced.
 
-  ## Parameters
+   """
 
-    - new_name: The new project name.
-    - old_name: The current project name to be replaced.
+   def change_project_name(new_name, old_name, ignore_list) do
+     process_directory(".", old_name, new_name, ignore_list)
+     IO.puts("Project name changed from #{old_name} to #{new_name}")
+   end
 
-  """
-  defp change_project_name(new_name, old_name)
 
-  @doc """
-  Processes a directory recursively, renaming files and updating contents.
+   @doc """
+   Processes a directory recursively, renaming files and updating contents.
 
-  ## Parameters
+   ## Parameters
 
-    - dir: The directory to process.
-    - old_name: The current project name to be replaced.
-    - new_name: The new project name.
+     - dir: The directory to process.
+     - old_name: The current project name to be replaced.
+     - new_name: The new project name.
 
-  """
-  defp process_directory(dir, old_name, new_name)
+   """
+   def process_directory(dir, old_name, new_name, ignore_list) do
+     File.ls!(dir)
+     |> Enum.each(fn item ->
+       path = Path.join(dir, item)
+       if should_process?(item, ignore_list) do
+         if File.dir?(path) do
+           new_dir = change_directory_name(path, old_name, new_name)
+           process_directory(new_dir, old_name, new_name, ignore_list)
+         else
+           change_file_content(path, old_name, new_name)
+           change_file_name(path, old_name, new_name)
+         end
+       end
+     end)
+   end
 
-  @doc """
-  Changes a directory name if it contains the old project name.
+   def should_process?(item, ignore_list) do
+     not (String.starts_with?(item, ".") or Enum.member?(ignore_list, item))
+   end
 
-  ## Parameters
 
-    - dir: The directory path to potentially rename.
-    - old_name: The current project name to be replaced.
-    - new_name: The new project name.
+   @doc """
+   Changes a directory name if it contains the old project name.
 
-  ## Returns
+   ## Parameters
 
-    The new directory name (which may be unchanged if no renaming occurred).
+     - dir: The directory path to potentially rename.
+     - old_name: The current project name to be replaced.
+     - new_name: The new project name.
 
-  """
-  defp change_directory_name(dir, old_name, new_name)
+   ## Returns
 
-  @doc """
-  Updates the content of a file, replacing occurrences of the old project name.
+     The new directory name (which may be unchanged if no renaming occurred).
 
-  ## Parameters
+   """
+   def change_directory_name(dir, old_name, new_name) do
+     new_dir = String.replace(dir, ~r/#{Regex.escape(old_name)}/i, fn matched ->
+       case_replace(matched, old_name, new_name)
+     end)
+     if dir != new_dir do
+       File.rename!(dir, new_dir)
+       IO.puts("Renamed directory: #{dir} -> #{new_dir}")
+     end
+     new_dir
+   end
 
-    - file: The file path to update.
-    - old_name: The current project name to be replaced.
-    - new_name: The new project name.
+   @doc """
+   Updates the content of a file, replacing occurrences of the old project name.
 
-  """
-  defp change_file_content(file, old_name, new_name)
+   ## Parameters
 
-  @doc """
-  Renames a file if its name contains the old project name.
+     - file: The file path to update.
+     - old_name: The current project name to be replaced.
+     - new_name: The new project name.
 
-  ## Parameters
+   """
+   def change_file_content(file, old_name, new_name) do
+     content = File.read!(file)
+     new_content = String.replace(content, ~r/#{Regex.escape(old_name)}/i, fn matched ->
+       case_replace(matched, old_name, new_name)
+     end)
+     if content != new_content do
+       File.write!(file, new_content)
+       IO.puts("Updated content in file: #{file}")
+     end
+   end
 
-    - file: The file path to potentially rename.
-    - old_name: The current project name to be replaced.
-    - new_name: The new project name.
+   @doc """
+   Renames a file if its name contains the old project name.
 
-  """
-  defp change_file_name(file, old_name, new_name)
+   ## Parameters
 
-  @doc """
-  Replaces the old name with the new name while preserving the original case.
+     - file: The file path to potentially rename.
+     - old_name: The current project name to be replaced.
+     - new_name: The new project name.
 
-  ## Parameters
+   """
+   def change_file_name(file, old_name, new_name) do
+     new_file = String.replace(file, ~r/#{Regex.escape(old_name)}/i, fn matched ->
+       case_replace(matched, old_name, new_name)
+     end)
+     if file != new_file do
+       File.rename!(file, new_file)
+       IO.puts("Renamed file: #{file} -> #{new_file}")
+     end
+   end
 
-    - matched: The matched string to be replaced.
-    - old_name: The current project name to be replaced.
-    - new_name: The new project name.
 
-  ## Returns
+   @doc """
+   Replaces the old name with the new name while preserving the original case.
 
-    The replaced string with preserved case.
+   ## Parameters
 
-  """
-  defp case_replace(matched, old_name, new_name)
+     - matched: The matched string to be replaced.
+     - old_name: The current project name to be replaced.
+     - new_name: The new project name.
 
-  defp print_usage do
-    IO.puts """
-    Usage: elixir change_project_name.exs <new_project_name> <old_project_name>
-    Example: elixir change_project_name.exs new_project_name old_project_name
+   ## Returns
 
-    Options:
-      -h    Show this help message
-    """
-  end
+     The replaced string with preserved case.
 
-  defp change_project_name(new_name, old_name) do
-    process_directory(".", old_name, new_name)
-    IO.puts("Project name changed from #{old_name} to #{new_name}")
-  end
+   """
+   def print_usage do
+     IO.puts """
+     Usage: elixir change_project_name.exs <new_project_name> <old_project_name> [--ignore folder1,folder2,...]
+     Example: elixir change_project_name.exs new_project_name old_project_name --ignore deps,_build
 
-  defp process_directory(dir, old_name, new_name) do
-    File.ls!(dir)
-    |> Enum.each(fn item ->
-      path = Path.join(dir, item)
-      if File.dir?(path) do
-        new_dir = change_directory_name(path, old_name, new_name)
-        process_directory(new_dir, old_name, new_name)
-      else
-        change_file_content(path, old_name, new_name)
-        change_file_name(path, old_name, new_name)
-      end
-    end)
-    
-    IO.puts("Project name changed from #{old_name} to #{new_name}")
-  end
+     Options:
+       -h              Show this help message
+       --ignore LIST   Comma-separated list of folders to ignore
 
-  defp change_directory_name(dir, old_name, new_name) do
-    new_dir = String.replace(dir, ~r/#{Regex.escape(old_name)}/i, fn matched ->
-      case_replace(matched, old_name, new_name)
-    end)
-    if dir != new_dir do
-      File.rename!(dir, new_dir)
-      IO.puts("Renamed directory: #{dir} -> #{new_dir}")
-    end
-    new_dir
-  end
+     Note: Hidden folders (starting with a dot) are automatically ignored.
+     """
+   end
 
-  defp change_file_content(file, old_name, new_name) do
-    content = File.read!(file)
-    new_content = String.replace(content, ~r/#{old_name}/i, fn matched ->
-      case_replace(matched, old_name, new_name)
-    end)
-    if content != new_content, do: File.write!(file, new_content)
-  end
 
-  defp change_file_name(file, old_name, new_name) do
-    new_file = String.replace(file, ~r/#{old_name}/i, fn matched ->
-      case_replace(matched, old_name, new_name)
-    end)
-    if file != new_file, do: File.rename(file, new_file)
-  end
+   def case_replace(matched, old_name, new_name) do
+     cond do
+       matched == String.upcase(old_name) -> String.upcase(new_name)
+       matched == String.downcase(old_name) -> String.downcase(new_name)
+       matched == Macro.camelize(old_name) -> Macro.camelize(new_name)
+       true -> new_name
+     end
+   end
+ end
 
-  defp case_replace(matched, old_name, new_name) do
-    cond do
-      matched == String.upcase(old_name) -> String.upcase(new_name)
-      matched == String.downcase(old_name) -> String.downcase(new_name)
-      matched == Macro.camelize(old_name) -> Macro.camelize(new_name)
-      true -> new_name
-    end
-  end
-end
-
-# Usage: elixir change_project_name.exs <new_project_name> <old_project_name>
-# Example: elixir change_project_name.exs new_project_name old_project_name
-ChangeProjectName.run(System.argv())
+ # Usage: elixir change_project_name.exs <new_project_name> <old_project_name>
+ # Example: elixir change_project_name.exs new_project_name old_project_name
+ ChangeProjectName.run(System.argv())

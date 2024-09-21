@@ -34,7 +34,7 @@ defmodule ListFiles do
   @doc """
   Prints the help message to the console.
   """
-  defp print_help do
+  def print_help do
     IO.puts """
     Usage: elixir listing_all_file.exs [FOLDER_PATH]
 
@@ -58,9 +58,10 @@ defmodule ListFiles do
     - folder_path: Path to the folder to process
 
   """
-  defp list_and_write_files(folder_path) do
+  def list_and_write_files(folder_path) do
     absolute_path = Path.expand(folder_path)
-    content = generate_content(absolute_path)
+    relative_path = Path.relative_to(absolute_path, File.cwd!())
+    content = generate_content(absolute_path, relative_path)
     index_path = Path.join(absolute_path, "index.md")
     File.write!(index_path, content)
 
@@ -79,33 +80,22 @@ defmodule ListFiles do
 
     A string containing the formatted content for index.md
   """
-  defp generate_content(folder_path) do
-    files_and_dirs = list_files_and_dirs(folder_path, 2)
+  def generate_content(folder_path, relative_path) do
+    files_and_dirs = list_files_and_dirs(folder_path, 2, relative_path)
 
-    # Group files by directory
-    grouped_files = 
-      Enum.group_by(files_and_dirs, fn {dir, _, _} -> dir end)
+    # IO.inspect(files_and_dirs, label: "files_and_dirs")
 
-    # Generate content for each directory
-    Enum.map(grouped_files, fn {dir, entries} ->
-      level = 2  # Adjust the level as needed
-      dir_title = if dir == "." do
-        "# All Files"
-      else
-        String.duplicate("#", level) <> " #{dir}"
-      end
-
-      # Collect all files for this directory
-      file_links = Enum.flat_map(entries, fn {_, files, _} -> 
-        Enum.map(files, fn file ->
-          title = extract_title(Path.join(dir, file))
-          "[#{title}](./#{file})"
-        end)
+    index_content = Enum.map(files_and_dirs, fn {dir, files, level} ->
+      dir_title = String.duplicate("#", level) <> " #{dir}"
+      file_links = Enum.map(files, fn file ->
+        title = extract_title(Path.join(dir, file))
+        "[#{title}](#{dir}/#{file})"
       end)
-
       [dir_title | file_links] |> Enum.join("\n\n")
     end)
     |> Enum.join("\n\n")
+
+    "# All File \n\n" <> index_content
   end
 
   @doc """
@@ -115,32 +105,27 @@ defmodule ListFiles do
 
     - path: Path to the directory to process
     - level: Current recursion level
+    - base_path: Base path for relative path calculation (optional)
 
   ## Returns
 
     A list of tuples containing directory names, lists of file names, and recursion levels
   """
-  defp list_files_and_dirs(path, level) do
+  def list_files_and_dirs(path, level, base_path \\ nil) do
+
     path
     |> File.ls!()
     |> Enum.reject(&(String.starts_with?(&1, ".")))
-    |> Enum.reduce({[], MapSet.new()}, fn item, {acc, seen} ->
+    |> Enum.reduce([], fn item, acc ->
       full_path = Path.join(path, item)
       if File.dir?(full_path) do
-        # Check if the directory has already been seen
-        unless MapSet.member?(seen, item) do
-          # Include the directory in the result
-          sub_files_and_dirs = list_files_and_dirs(full_path, level + 1)
-          {acc ++ [{item, list_files(full_path), level}] ++ elem(sub_files_and_dirs, 0), MapSet.put(seen, item)}
-        else
-          {acc, seen}
-        end
+        relative_path = Path.join(base_path, item)
+        sub_files_and_dirs = list_files_and_dirs(full_path, level + 1, relative_path)
+        [{relative_path, list_files(full_path), level} | sub_files_and_dirs] ++ acc
       else
-        # Include files in the result
-        {acc ++ [{Path.basename(path), [item], level}], seen}  # Include files in the result
+        acc
       end
     end)
-    |> elem(0)
   end
 
   @doc """
@@ -154,7 +139,7 @@ defmodule ListFiles do
 
     A list of file names
   """
-  defp list_files(path) do
+  def list_files(path) do
     path
     |> File.ls!()
     |> Enum.reject(&(String.starts_with?(&1, ".")))
@@ -172,7 +157,7 @@ defmodule ListFiles do
 
     The title of the file, or the file name if no title is found
   """
-  defp extract_title(file_path) do
+  def extract_title(file_path) do
     if String.ends_with?(file_path, ".md") do
       case File.read(file_path) do
         {:ok, content} ->
@@ -198,7 +183,7 @@ defmodule ListFiles do
 
     The absolute path as a string
   """
-  defp expand_path(path) do
+  def expand_path(path) do
     Path.expand(path)
   end
 end
